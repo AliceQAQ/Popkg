@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# @ Author: Polly
+# @ Project Name : Polly Package Manager
+# @ Version : v0.0.2
+# @ Last Modified: 2022-02-08
+# @ Description: A high-available Linux Package Manager for Polly Linux
+export PREFIX=$HOME/.popkg
+WORKDIR=$HOME/popkg
+PACKAGE=$2
+PWD=$(pwd)
+function usage(){
+cat << EOF
+Usage:  popkg arguments{install|uninstall} package
+	
+	init       init a directory for packing
+	pack	   pack your polly package to a polly gzip file
+	version    version of popkg
+	install    install package
+	uninstall  uninstall pacakge
+	search	   search packages
+EOF
+}
+
+
+function init()
+{
+	mkdir $PACKAGE && cd $PACKAGE
+	touch PopkgInstall
+	touch PopkgUninstall
+	chmod 755 PopkgInstall
+	chmod 755 PopkgUninstall
+	echo "#!/usr/bin/env bash" >> PopkgInstall
+	echo "PWD=\$(pwd)" >> PopkgInstall
+	echo "NAME=${PACKAGE}" >> PopkgInstall
+	echo "PKGNAME=${PACKAGE}" >> PopkgInstall
+	echo "PREFIX=\$HOME/.local/share" >> PopkgInstall
+	echo "TEMPDIR=\$HOME/.cache" >> PopkgInstall
+	echo "#!/usr/bin/env bash" >> PopkgUninstall
+	echo "PWD=\$(pwd)" >> PopkgUninstall
+	echo "NAME=${PACKAGE}" >> PopkgUninstall
+	echo "PKGNAME=${PACKAGE}" >> PopkgUninstall
+	echo "PREFIX=\$HOME/.local/share" >> PopkgUninstall
+	echo "TEMPDIR=\$HOME/.cache" >> PopkgUninstall
+
+
+}
+
+
+function help()
+{
+	usage
+}
+
+
+function pack()
+{
+	cd $WORKDIR
+	if [[ -z $PACKAGE ]];
+	then
+		echo "Error: You must specific aleast one package name"
+	else
+		if [[ -f "$PACKAGE/PopkgInstall" ]]&& [[ "$PACKAGE/PopkgUninstall" ]];
+		then
+			tar -zcf $PACKAGE.polly $PACKAGE
+			md5sum "${PACKAGE}.polly" | awk '{print $1}' > $PACKAGE.md5sum
+		else
+			echo "Error: Missing PopkgInstall or PopkgUninstall."
+		fi
+	fi
+}
+
+function install(){
+	if [[ -z $PACKAGE ]];
+	then
+		echo "Error: You must specific aleast one package name."
+	else
+	pkg_file="${PACKAGE}.polly"
+	md5_file="${PACKAGE}.md5sum"
+	curl -O http://127.0.0.1/$pkg_file
+	curl -O http://127.0.0.1/$md5_file
+	MD5_RESULT=$(md5sum ${pkg_file} | awk '{print $1}')
+	MD5SUM=$(cat ${md5_file})
+
+	if [[ $MD5SUM == $MD5_RESULT ]];
+	then
+		echo "Installing $PACKAGE ..."
+		mkdir -p $PREFIX/$PACKAGE
+		tar -xf $pkg_file -C $PREFIX
+		chmod 755 $PREFIX/$PACKAGE/PopkgInstall
+		chmod 755 $PREFIX/$PACKAGE/PopkgUninstall
+		bash $PREFIX/$PACKAGE/PopkgInstall
+		echo "Done!"
+	else
+		echo "Error: Oops...broken package $PACKAGE"
+	fi
+	fi
+}
+
+
+function uninstall(){
+	if [[ -z $PACKAGE ]];
+	then
+		echo "Error: You must specific aleast one package name."
+	else
+		if [[ ! -d "${PREFIX}/${PACKAGE}" ]];
+		then
+			echo "Error: $PACKAGE not found."
+			echo "Maybe you can: "
+			echo "	sudo popkg install $PACKAGE"
+		else
+			bash $PREFIX/$PACKAGE/PopkgUninstall
+			echo "Done!"
+		fi
+	fi
+}
+
+function search(){
+	RESULT=$(curl -s http://127.0.0.1/package_list | grep $PACKAGE)
+	if [[ -z $RESULT ]];
+	then
+		echo "Popkg: No Package named $PACKAGE."
+	else
+		echo "$RESULT"
+	fi
+
+}
+
+case $1 in
+"init")
+init
+;;
+"pack")
+pack
+;;
+"install")
+install
+;;
+"uninstall")
+uninstall
+;;
+"help")
+help
+;;
+"search")
+search
+;;
+"version")
+cat << EOF
+██████╗  ██████╗ ██████╗ ██╗  ██╗ ██████╗ 
+██╔══██╗██╔═══██╗██╔══██╗██║ ██╔╝██╔════╝ 
+██████╔╝██║   ██║██████╔╝█████╔╝ ██║  ███╗
+██╔═══╝ ██║   ██║██╔═══╝ ██╔═██╗ ██║   ██║
+██║     ╚██████╔╝██║     ██║  ██╗╚██████╔╝
+╚═╝      ╚═════╝ ╚═╝     ╚═╝  ╚═╝ ╚═════╝ 
+
+Polly Package Manager
+Version : 0.0.1
+EOF
+;;
+*)
+usage
+esac
+	
+                                         
